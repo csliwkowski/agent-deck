@@ -10913,8 +10913,10 @@ func (h *Home) renderPreviewPane(width, height int) string {
 				safeLine = ansi.Truncate(safeLine, maxWidth-3, "...")
 			}
 
+			// Reset background color at end of line to prevent ANSI background
+			// bleeding into the left panel via lipgloss.JoinHorizontal.
 			b.WriteString(safeLine)
-			b.WriteString("\n")
+			b.WriteString("\x1b[49m\n")
 		}
 	}
 
