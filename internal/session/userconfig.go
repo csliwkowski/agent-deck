@@ -942,6 +942,18 @@ type DisplaySettings struct {
 	// Can also be enabled via AGENTDECK_REPAINT=full env var.
 	// Default: false
 	FullRepaint bool `toml:"full_repaint"`
+
+	// PanelRatio controls the left panel width as a fraction of terminal width.
+	// Range: 0.15–0.50. Default: 0.35. Adjustable with Alt+Shift+Left/Right.
+	PanelRatio float64 `toml:"panel_ratio"`
+}
+
+// GetPanelRatio returns the configured panel ratio, defaulting to 0.35.
+func (d DisplaySettings) GetPanelRatio() float64 {
+	if d.PanelRatio >= 0.15 && d.PanelRatio <= 0.50 {
+		return d.PanelRatio
+	}
+	return 0.35
 }
 
 // GetFullRepaint returns whether full-repaint mode is active, checking

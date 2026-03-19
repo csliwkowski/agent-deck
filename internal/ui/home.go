@@ -148,8 +148,9 @@ const (
 // Home is the main application model
 type Home struct {
 	// Dimensions
-	width  int
-	height int
+	width      int
+	height     int
+	panelRatio float64 // left panel width ratio (0.15–0.50, default 0.35)
 
 	// Profile
 	profile string // The profile this Home is displaying
@@ -661,6 +662,7 @@ func NewHomeWithProfileAndMode(profile string) *Home {
 		geminiModelDialog:    NewGeminiModelDialog(),
 		sessionPickerDialog:  NewSessionPickerDialog(),
 		worktreeFinishDialog: NewWorktreeFinishDialog(),
+		panelRatio:           0.35,
 		cursor:               0,
 		initialLoading:       true, // Show splash until sessions load
 		ctx:                  ctx,
@@ -701,11 +703,13 @@ func NewHomeWithProfileAndMode(profile string) *Home {
 
 	h.reloadHotkeysFromConfig()
 
-	// Cache full-repaint setting (config.toml [display] full_repaint or AGENTDECK_REPAINT=full)
+	// Cache display settings (config.toml [display])
 	if cfg, _ := session.LoadUserConfig(); cfg != nil {
 		h.fullRepaint = cfg.Display.GetFullRepaint()
+		h.panelRatio = cfg.Display.GetPanelRatio()
 	} else {
 		h.fullRepaint = (session.DisplaySettings{}).GetFullRepaint()
+		h.panelRatio = (session.DisplaySettings{}).GetPanelRatio()
 	}
 
 	// Keep settings panel profile-aware so profile overrides (e.g., Claude config dir)
@@ -4561,7 +4565,7 @@ func (h *Home) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 		// Check if click is in the session list panel
 		if h.getLayoutMode() == LayoutModeDual {
-			leftWidth := int(float64(h.width) * 0.35)
+			leftWidth := int(float64(h.width) * h.panelRatio)
 			if msg.X >= leftWidth {
 				return h, nil
 			}
@@ -4671,6 +4675,16 @@ func (h *Home) mouseYToItemIndex(y int) int {
 	return itemIndex
 }
 
+// savePanelRatio persists the current panel ratio to config.toml.
+func (h *Home) savePanelRatio() {
+	cfg, _ := session.LoadUserConfig()
+	if cfg == nil {
+		cfg = &session.UserConfig{}
+	}
+	cfg.Display.PanelRatio = h.panelRatio
+	_ = session.SaveUserConfig(cfg)
+}
+
 // handleMainKey handles keys in main view
 func (h *Home) handleMainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := h.normalizeMainKey(msg.String())
@@ -4695,6 +4709,19 @@ func (h *Home) handleMainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// First ESC - record time, show hint in status bar
 		h.lastEscTime = time.Now()
+		return h, nil
+
+	case "alt+shift+left":
+		if h.panelRatio > 0.15 {
+			h.panelRatio -= 0.05
+			h.savePanelRatio()
+		}
+		return h, nil
+	case "alt+shift+right":
+		if h.panelRatio < 0.50 {
+			h.panelRatio += 0.05
+			h.savePanelRatio()
+		}
 		return h, nil
 
 	case "up", "k":
@@ -8111,7 +8138,7 @@ func (h *Home) renderDualColumnLayout(contentHeight int) string {
 	var b strings.Builder
 
 	// Calculate panel widths (35% left, 65% right for more preview space)
-	leftWidth := int(float64(h.width) * 0.35)
+	leftWidth := int(float64(h.width) * h.panelRatio)
 	rightWidth := h.width - leftWidth - 3 // -3 for separator
 
 	// Panel title is exactly 2 lines (title + underline)
